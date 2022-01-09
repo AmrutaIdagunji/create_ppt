@@ -1,0 +1,97 @@
+# Start the PowerPoint application
+from Spotfire.Dxp.Framework.ApplicationModel import NotificationService
+notify = Application.GetService[NotificationService]()
+
+
+# import libraries
+from Spotfire.Dxp.Application.Filters import ListBoxFilter
+from System.Collections.Generic import List
+from System import Array
+from System.Drawing import Bitmap, Graphics, Rectangle, Point, Image
+from Spotfire.Dxp.Application.Visuals import *
+from System.IO import *
+import clr
+from System import Environment
+from System.Drawing import Size, Image
+from System.Threading import CancellationToken
+from System.Drawing.Imaging import ImageFormat
+from System.Runtime.InteropServices import Marshal
+from System import GC
+from Spotfire.Dxp.Application.Filters import FilterTypeIdentifiers, ListBoxFilter
+from Spotfire.Dxp.Data import DataPropertyClass
+from System import String
+import time
+
+clr.AddReference("Microsoft.Office.Interop.PowerPoint")
+
+import Microsoft.Office.Interop.PowerPoint as PowerPoint
+
+strFolderPathTemp = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+
+# create 3 .png temp files to store images of the visuals to be exported
+file1 = strFolderPathTemp + "\\_image1.png"
+file2 = strFolderPathTemp + "\\_image2.png"
+file3 = strFolderPathTemp + "\\_image3.png"
+
+
+# Start the PPT application
+powerpoint = PowerPoint.ApplicationClass()
+powerpoint.Visible = True
+
+page = Document.Pages[1] # this is the page to be exported to PPT slide
+
+def genVizImage(pageVisName, file, size):
+	global propCounter
+
+	#s = Size(718, 450)
+
+	rrs = RenderResultSettings(size)	
+	vrs = VisualRenderSettings()
+	vrs.ShowAnnotations = Visibility.Visible
+	vrs.ShowTitle = Visibility.Visible
+	rresult = pageVisName.RenderAsync(rrs, vrs, CancellationToken(False))
+
+	if rresult.Result.IsValid:
+		image = rresult.Result.AsImage()
+		image.Save(file)
+
+# Create new powerpoint presentation
+pres = powerpoint.Presentations.Add()
+slideCounter = 1
+
+# Render visuals as images
+genVizImage(visual1, file1, Size(800, 250))
+genVizImage(visual2, file2, Size(250, 250))
+genVizImage(visual3, file3, Size(250, 250))
+
+# Add a blank slide to the PPT
+slide=pres.Slides.Add(slideCounter, PowerPoint.PpSlideLayout.ppLayoutTitleOnly)
+
+# Add picture to the slide
+slide.Shapes.AddPicture((file1), False, True, Left=120, Top=80, Width=-1, Height=-1)
+slide.Shapes.AddPicture((file2), False, True, Left=120, Top=280, Width=-1, Height=-1)
+slide.Shapes.AddPicture((file3), False, True, Left=520, Top=280, Width=-1, Height=-1)
+
+# Add Title
+slide.Shapes.AddTextBox(Orientation = 1,Left = 10, Top = 200, Width = 200, Height = 100)
+slide.Shapes.Title.Top = 0.1
+slide.Shapes.Title.TextFrame.TextRange.Text = title # You can change the title of the slide here
+slide.Shapes.Title.TextFrame.TextRange.Font.Size=28
+
+# Directory.CreateDirectory(dir) - if new folder to be created
+
+pres.SaveAs(strFolderPathTemp + "\\presentationSample".pptx")
+pres.Close()
+
+powerpoint.Quit()
+# To close the PPT applciation use the Grabage collector
+Marshal.FinalReleaseComObject(powerpoint);
+GC.Collect();
+
+# delete the image files if not needed.
+File.Delete(file1)
+File.Delete(file2)
+File.Delete(file3)
+
+# Show process completion notification
+notify.AddInformationNotification("Export Completed","Please check " + strFolderPathTemp + " path for the exported PPTs" ,"");
